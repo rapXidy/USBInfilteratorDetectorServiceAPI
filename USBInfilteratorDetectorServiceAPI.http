@@ -1,0 +1,6 @@
+@USBInfilteratorDetectorServiceAPI_HostAddress = http://localhost:5174
+
+GET {{USBInfilteratorDetectorServiceAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
