@@ -78,6 +78,10 @@ namespace USBInfilteratorDetectorServiceAPI.Infrastructure.Persistence.Migration
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -252,12 +256,23 @@ namespace USBInfilteratorDetectorServiceAPI.Infrastructure.Persistence.Migration
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("DestinationEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(1024)
                         .HasColumnType("nvarchar(1024)");
 
+                    b.Property<DateTime?>("LastAttemptedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("SentAt")
                         .HasColumnType("datetime2");
@@ -283,6 +298,8 @@ namespace USBInfilteratorDetectorServiceAPI.Infrastructure.Persistence.Migration
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId");
+
+                    b.HasIndex("Status", "RetryCount", "CreatedAt");
 
                     b.ToTable("NotificationsLogs", (string)null);
                 });

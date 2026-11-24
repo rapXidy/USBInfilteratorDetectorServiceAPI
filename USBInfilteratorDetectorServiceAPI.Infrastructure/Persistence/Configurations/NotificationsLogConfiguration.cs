@@ -15,7 +15,9 @@ public class NotificationsLogConfiguration : IEntityTypeConfiguration<Notificati
         builder.Property(x => x.Body).IsRequired();
         builder.Property(x => x.Channel).HasConversion<string>().HasMaxLength(32);
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.DestinationEmail).IsRequired().HasMaxLength(256);
         builder.Property(x => x.ErrorMessage).HasMaxLength(1024);
+        builder.HasIndex(x => new { x.Status, x.RetryCount, x.CreatedAt });
 
         builder.HasOne(x => x.Organization)
             .WithMany(x => x.Notifications)

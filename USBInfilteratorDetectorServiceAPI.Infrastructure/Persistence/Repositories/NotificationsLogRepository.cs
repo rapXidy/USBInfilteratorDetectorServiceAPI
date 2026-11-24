@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using USBInfilteratorDetectorServiceAPI.Domain.Entities;
+using USBInfilteratorDetectorServiceAPI.Domain.Enums;
 using USBInfilteratorDetectorServiceAPI.Domain.Interfaces;
 
 namespace USBInfilteratorDetectorServiceAPI.Infrastructure.Persistence.Repositories;
@@ -23,6 +24,20 @@ public class NotificationsLogRepository : INotificationsLogRepository
             .Where(x => x.OrganizationId == organizationId)
             .OrderByDescending(x => x.CreatedAt)
             .Take(take)
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<NotificationsLog>> GetPendingForDispatchAsync(
+        int batchSize,
+        int maxAttempts,
+        CancellationToken cancellationToken = default)
+        => await _db.NotificationsLogs
+            .Where(x =>
+                x.Channel == NotificationChannel.Email &&
+                x.Status == NotificationStatus.Pending &&
+                x.RetryCount < maxAttempts)
+            .OrderBy(x => x.CreatedAt)
+            .Take(batchSize)
             .ToListAsync(cancellationToken);
 
     /// <inheritdoc />

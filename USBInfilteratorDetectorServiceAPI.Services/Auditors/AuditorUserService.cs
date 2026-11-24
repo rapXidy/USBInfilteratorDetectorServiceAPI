@@ -13,14 +13,23 @@ namespace USBInfilteratorDetectorServiceAPI.Services.Auditors;
 public class AuditorUserService
 {
     private readonly IAuditorRepository _auditors;
+    private readonly IOrganizationRepository _organizations;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly INotificationEnqueueService _notifications;
 
-    public AuditorUserService(IAuditorRepository auditors, IUnitOfWork unitOfWork, IPasswordHasher passwordHasher)
+    public AuditorUserService(
+        IAuditorRepository auditors,
+        IOrganizationRepository organizations,
+        IUnitOfWork unitOfWork,
+        IPasswordHasher passwordHasher,
+        INotificationEnqueueService notifications)
     {
         _auditors = auditors;
+        _organizations = organizations;
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
+        _notifications = notifications;
     }
 
     /// <summary>
@@ -43,6 +52,8 @@ public class AuditorUserService
         if (await _auditors.UsernameExistsAsync(organizationId, request.Username.Trim(), cancellationToken: cancellationToken))
             throw new ServiceException("Username already exists in this organization.", 409);
 
+        var email = NormalizeEmail(request.Email);
+
         var auditor = new Auditor
         {
             Id = Guid.NewGuid(),
@@ -50,6 +61,7 @@ public class AuditorUserService
             Username = request.Username.Trim(),
             PasswordHash = _passwordHasher.Hash(request.Password),
             DisplayName = request.DisplayName.Trim(),
+            Email = email,
             Role = request.Role,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
@@ -57,6 +69,14 @@ public class AuditorUserService
 
         await _auditors.AddAsync(auditor, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var organization = await _organizations.GetByIdAsync(organizationId, cancellationToken);
+            if (organization is not null)
+                await _notifications.EnqueueAuditorWelcomeAsync(organization, auditor, cancellationToken);
+        }
+
         return Map(auditor);
     }
 
@@ -77,6 +97,7 @@ public class AuditorUserService
         }
 
         auditor.DisplayName = request.DisplayName.Trim();
+        auditor.Email = NormalizeEmail(request.Email);
         auditor.Role = request.Role;
         auditor.IsActive = request.IsActive;
         auditor.UpdatedAt = DateTime.UtcNow;
@@ -114,6 +135,9 @@ public class AuditorUserService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
+    private static string? NormalizeEmail(string? email)
+        => string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+
     private static AuditorUserResponse Map(Auditor auditor)
-        => new(auditor.Id, auditor.Username, auditor.DisplayName, auditor.Role, auditor.IsActive, auditor.CreatedAt, auditor.LastLoginAt);
+        => new(auditor.Id, auditor.Username, auditor.DisplayName, auditor.Email, auditor.Role, auditor.IsActive, auditor.CreatedAt, auditor.LastLoginAt);
 }

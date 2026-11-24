@@ -15,6 +15,18 @@ public class NotificationsLog
     public string Body { get; set; } = string.Empty;
     public NotificationChannel Channel { get; set; }
     public NotificationStatus Status { get; set; }
+    /// <summary>
+    /// Recipient address for email channel notifications.
+    /// </summary>
+    public string DestinationEmail { get; set; } = string.Empty;
+    /// <summary>
+    /// Number of dispatch attempts made by the background worker.
+    /// </summary>
+    public int RetryCount { get; set; }
+    /// <summary>
+    /// UTC timestamp of the most recent dispatch attempt.
+    /// </summary>
+    public DateTime? LastAttemptedAt { get; set; }
     public DateTime? SentAt { get; set; }
     public string? ErrorMessage { get; set; }
     public DateTime CreatedAt { get; set; }

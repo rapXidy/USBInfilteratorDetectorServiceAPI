@@ -20,6 +20,7 @@ public class OnboardingService
     private readonly IPasswordHasher _passwordHasher;
     private readonly ICorpCodeGenerator _corpCodeGenerator;
     private readonly IApiKeyGenerator _apiKeyGenerator;
+    private readonly INotificationEnqueueService _notifications;
 
     public OnboardingService(
         IOrganizationRepository organizations,
@@ -29,7 +30,8 @@ public class OnboardingService
         IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
         ICorpCodeGenerator corpCodeGenerator,
-        IApiKeyGenerator apiKeyGenerator)
+        IApiKeyGenerator apiKeyGenerator,
+        INotificationEnqueueService notifications)
     {
         _organizations = organizations;
         _auditors = auditors;
@@ -39,6 +41,7 @@ public class OnboardingService
         _passwordHasher = passwordHasher;
         _corpCodeGenerator = corpCodeGenerator;
         _apiKeyGenerator = apiKeyGenerator;
+        _notifications = notifications;
     }
 
     /// <summary>
@@ -161,6 +164,8 @@ public class OnboardingService
         }, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await _notifications.EnqueueOnboardingCredentialsAsync(organization, corpCode, apiKey, cancellationToken);
 
         var auditors = await _auditors.ListByOrganizationAsync(organization.Id, cancellationToken);
         var adminUsername = auditors.FirstOrDefault(x => x.Role == AuditorRole.Admin)?.Username ?? string.Empty;

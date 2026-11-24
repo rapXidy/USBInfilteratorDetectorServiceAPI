@@ -98,15 +98,34 @@ Copy `appsettings.Development.json.example` to `appsettings.Development.json` (o
   "ServiceAuth": {
     "ApiKey": "<shared-secret-for-worker-services>"
   },
-  "Email": {
-    "Provider": "Resend",
-    "ApiKey": "<your-key>",
-    "FromAddress": "alerts@yourdomain.com"
+  "EmailSettings": {
+    "SmtpServer": "smtp.gmail.com",
+    "Port": 587,
+    "Username": "",
+    "Password": "",
+    "SenderName": "USB Exfiltration Detector",
+    "SenderEmail": ""
+  },
+  "Notifications": {
+    "HighRiskThreshold": 50,
+    "Email": { "Enabled": false, "FromAddress": null },
+    "Dispatch": {
+      "MaxAttempts": 2,
+      "BatchSize": 50,
+      "PollingIntervalSeconds": 60
+    }
   }
 }
 ```
 
-**Never commit real secrets.** Use environment variables or a secret store in production.
+**Never commit real secrets.** Use user secrets locally and environment variables or a secret store in production:
+
+```bash
+dotnet user-secrets set "EmailSettings:Username" "your-account@gmail.com"
+dotnet user-secrets set "EmailSettings:Password" "your-google-app-password"
+dotnet user-secrets set "EmailSettings:SenderEmail" "your-account@gmail.com"
+dotnet user-secrets set "Notifications:Email:Enabled" "true"
+```
 
 ### 3. Database
 
@@ -279,12 +298,15 @@ The Worker Service must send payloads that match this contract (see the Worker S
 
 ## Notifications
 
-When a high-risk session is ingested or required Windows audit settings are reported as missing, the API can:
+Outbound email uses **MailKit** + Gmail SMTP (`EmailSettings`). Domain events enqueue `NotificationsLog` rows (`Pending`); `NotificationBackgroundService` sends them with retries controlled by `Notifications:Dispatch` (`MaxAttempts`, `BatchSize`, `PollingIntervalSeconds`).
 
-1. Send an email to the organisation’s security contacts
-2. Fire a configured webhook
+Triggered emails:
 
-Delivery attempts are recorded in `NotificationsLog`.
+1. **Onboarding complete** — CorpCode + API key to the organization email
+2. **Auditor created** — welcome mail when the auditor has an email address
+3. **High-risk / incomplete audit** — active auditors with email, else organization email
+
+Delivery attempts are recorded in `NotificationsLog` (`Sent` / `Failed` after configured max attempts).
 
 ---
 
