@@ -9,5 +9,14 @@ public interface INotificationsLogRepository
 {
     Task AddAsync(NotificationsLog entry, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<NotificationsLog>> ListRecentAsync(Guid organizationId, int take, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns pending email notifications that still have attempts remaining.
+    /// </summary>
+    Task<IReadOnlyList<NotificationsLog>> GetPendingForDispatchAsync(
+        int batchSize,
+        int maxAttempts,
+        CancellationToken cancellationToken = default);
+
     void Update(NotificationsLog entry);
 }

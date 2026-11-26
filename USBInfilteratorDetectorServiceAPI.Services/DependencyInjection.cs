@@ -5,10 +5,12 @@ using USBInfilteratorDetectorServiceAPI.Services.Dashboard;
 using USBInfilteratorDetectorServiceAPI.Services.Devices;
 using USBInfilteratorDetectorServiceAPI.Services.HrStaff;
 using USBInfilteratorDetectorServiceAPI.Services.Ingest;
+using USBInfilteratorDetectorServiceAPI.Services.Notifications;
 using USBInfilteratorDetectorServiceAPI.Services.Onboarding;
 using USBInfilteratorDetectorServiceAPI.Services.Organizations;
 using USBInfilteratorDetectorServiceAPI.Services.Sessions;
 using USBInfilteratorDetectorServiceAPI.Services.Subscriptions;
+using USBInfilteratorDetectorServiceAPI.Services.Abstractions;
 
 namespace USBInfilteratorDetectorServiceAPI.Services;
 
@@ -35,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<HrStaffService>();
         services.AddScoped<SubscriptionService>();
         services.AddScoped<DashboardService>();
+        services.AddScoped<INotificationEnqueueService, NotificationEnqueueService>();
         return services;
     }
 }

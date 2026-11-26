@@ -8,20 +8,25 @@ using USBInfilteratorDetectorServiceAPI.Services.Abstractions;
 using USBInfilteratorDetectorServiceAPI.Services.Common;
 using USBInfilteratorDetectorServiceAPI.Services.DTOs;
 using USBInfilteratorDetectorServiceAPI.Services.Options;
+using USBInfilteratorDetectorServiceAPI.Services.Security;
 
 namespace USBInfilteratorDetectorServiceAPI.Services.Auth;
 
 /// <summary>
-/// Handles tenant auditor authentication, refresh, and logout.
+/// Handles tenant auditor authentication, refresh, logout, and password flows.
 /// </summary>
 public class AuthService
 {
+    private const string ForgotPasswordGenericMessage =
+        "If an account matches those details and has an email on file, a temporary password has been sent.";
+
     private readonly IOrganizationRepository _organizations;
     private readonly IAuditorRepository _auditors;
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
+    private readonly INotificationEnqueueService _notifications;
     private readonly JwtOptions _jwtOptions;
 
     public AuthService(
@@ -31,6 +36,7 @@ public class AuthService
         IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
         IJwtTokenService jwtTokenService,
+        INotificationEnqueueService notifications,
         IOptions<JwtOptions> jwtOptions)
     {
         _organizations = organizations;
@@ -39,6 +45,7 @@ public class AuthService
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
+        _notifications = notifications;
         _jwtOptions = jwtOptions.Value;
     }
 
@@ -62,6 +69,61 @@ public class AuthService
         auditor.LastLoginAt = DateTime.UtcNow;
         _auditors.Update(auditor);
         return await IssueTokensAsync(auditor, organization, cancellationToken);
+    }
+
+    /// <summary>
+    /// Issues a temporary password by email when possible; always returns a generic success message.
+    /// </summary>
+    public async Task<ForgotPasswordResponse> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.CorpCode) || string.IsNullOrWhiteSpace(request.Username))
+            return new ForgotPasswordResponse(ForgotPasswordGenericMessage);
+
+        var organization = await _organizations.GetByCorpCodeAsync(request.CorpCode.Trim(), cancellationToken);
+        if (organization is null || !organization.IsActive || organization.OnboardingStatus != OnboardingStatus.Completed)
+            return new ForgotPasswordResponse(ForgotPasswordGenericMessage);
+
+        var auditor = await _auditors.GetByUsernameAsync(organization.Id, request.Username.Trim(), cancellationToken);
+        if (auditor is null || !auditor.IsActive || string.IsNullOrWhiteSpace(auditor.Email))
+            return new ForgotPasswordResponse(ForgotPasswordGenericMessage);
+
+        var temporaryPassword = TemporaryPasswordGenerator.Generate();
+        auditor.PasswordHash = _passwordHasher.Hash(temporaryPassword);
+        auditor.UpdatedAt = DateTime.UtcNow;
+        _auditors.Update(auditor);
+        await _refreshTokens.RevokeAllForAuditorAsync(auditor.Id, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await _notifications.EnqueuePasswordResetAsync(organization, auditor, temporaryPassword, cancellationToken);
+
+        return new ForgotPasswordResponse(ForgotPasswordGenericMessage);
+    }
+
+    /// <summary>
+    /// Changes the authenticated auditor's password and revokes existing refresh tokens.
+    /// </summary>
+    public async Task ChangePasswordAsync(Guid organizationId, Guid auditorId, ChangePasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
+            throw new ServiceException("Current and new passwords are required.");
+
+        if (request.NewPassword.Length < 8)
+            throw new ServiceException("New password must be at least 8 characters.");
+
+        var auditor = await _auditors.GetByIdAsync(organizationId, auditorId, cancellationToken)
+            ?? throw new ServiceException("Auditor not found.", 404);
+
+        if (!auditor.IsActive)
+            throw new ServiceException("Account is inactive.", 403);
+
+        if (!_passwordHasher.Verify(request.CurrentPassword, auditor.PasswordHash))
+            throw new ServiceException("Current password is incorrect.", 400);
+
+        auditor.PasswordHash = _passwordHasher.Hash(request.NewPassword);
+        auditor.UpdatedAt = DateTime.UtcNow;
+        _auditors.Update(auditor);
+        await _refreshTokens.RevokeAllForAuditorAsync(auditor.Id, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>

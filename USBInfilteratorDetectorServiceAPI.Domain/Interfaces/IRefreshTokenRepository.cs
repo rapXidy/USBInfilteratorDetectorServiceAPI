@@ -21,4 +21,9 @@ public interface IRefreshTokenRepository
     /// Updates a tracked refresh token.
     /// </summary>
     void Update(RefreshToken token);
+
+    /// <summary>
+    /// Revokes all non-revoked refresh tokens for an auditor.
+    /// </summary>
+    Task RevokeAllForAuditorAsync(Guid auditorId, CancellationToken cancellationToken = default);
 }

@@ -23,11 +23,30 @@ public static class DependencyInjection
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<NotificationOptions>(configuration.GetSection(NotificationOptions.SectionName));
+        services.Configure<EmailSettings>(configuration.GetSection(EmailSettings.SectionName));
         services.Configure<AppCorsOptions>(configuration.GetSection(AppCorsOptions.SectionName));
+        services.Configure<PortalOptions>(options =>
+            options.PortalUrl = configuration[PortalOptions.PortalUrlKey] ?? options.PortalUrl);
 
         var superAdmins = configuration.GetSection(SuperAdminOptions.SectionName).Get<List<SuperAdminAccountOptions>>()
                           ?? new List<SuperAdminAccountOptions>();
         services.Configure<SuperAdminOptions>(options => options.Accounts = superAdmins);
+
+        var emailEnabled = configuration.GetValue($"{NotificationOptions.SectionName}:Email:Enabled", false);
+        if (emailEnabled)
+        {
+            services.AddOptions<EmailSettings>()
+                .Bind(configuration.GetSection(EmailSettings.SectionName))
+                .Validate(
+                    settings =>
+                        !string.IsNullOrWhiteSpace(settings.SmtpServer) &&
+                        settings.Port > 0 &&
+                        settings.Port <= 65535 &&
+                        !string.IsNullOrWhiteSpace(settings.Username) &&
+                        !string.IsNullOrWhiteSpace(settings.Password),
+                    "Email SMTP configuration is incomplete or invalid.")
+                .ValidateOnStart();
+        }
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseSqlServer(
@@ -49,8 +68,10 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
         services.AddSingleton<ICorpCodeGenerator, CorpCodeGenerator>();
         services.AddSingleton<IApiKeyGenerator, ApiKeyGenerator>();
+        services.AddSingleton<IEmailTemplateRenderer, EmailTemplateRenderer>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IEmailNotificationSender, EmailNotificationSender>();
+        services.AddHostedService<NotificationBackgroundService>();
 
         return services;
     }

@@ -19,10 +19,10 @@ public class IngestService
     private readonly IOrganizationApiCredentialRepository _credentials;
     private readonly IHostRepository _hosts;
     private readonly IUsbSessionRepository _sessions;
-    private readonly INotificationsLogRepository _notifications;
+    private readonly IAuditorRepository _auditors;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
-    private readonly IEmailNotificationSender _emailSender;
+    private readonly INotificationEnqueueService _notificationEnqueue;
     private readonly NotificationOptions _notificationOptions;
 
     public IngestService(
@@ -30,20 +30,20 @@ public class IngestService
         IOrganizationApiCredentialRepository credentials,
         IHostRepository hosts,
         IUsbSessionRepository sessions,
-        INotificationsLogRepository notifications,
+        IAuditorRepository auditors,
         IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
-        IEmailNotificationSender emailSender,
+        INotificationEnqueueService notificationEnqueue,
         IOptions<NotificationOptions> notificationOptions)
     {
         _organizations = organizations;
         _credentials = credentials;
         _hosts = hosts;
         _sessions = sessions;
-        _notifications = notifications;
+        _auditors = auditors;
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
-        _emailSender = emailSender;
+        _notificationEnqueue = notificationEnqueue;
         _notificationOptions = notificationOptions.Value;
     }
 
@@ -171,36 +171,14 @@ public class IngestService
 
         if (session.RiskScore >= _notificationOptions.HighRiskThreshold || incompleteDetection)
         {
-            await QueueNotificationAsync(organization, session, incompleteDetection, cancellationToken);
+            var auditors = await _auditors.ListByOrganizationAsync(organization.Id, cancellationToken);
+            await _notificationEnqueue.EnqueueHighRiskSessionAsync(
+                organization,
+                session,
+                host,
+                incompleteDetection,
+                auditors,
+                cancellationToken);
         }
-    }
-
-    private async Task QueueNotificationAsync(Organization organization, UsbSession session, bool incompleteDetection, CancellationToken cancellationToken)
-    {
-        var title = incompleteDetection
-            ? "Detection incomplete – required audit settings are disabled"
-            : $"High-risk USB session (score {session.RiskScore})";
-
-        var body =
-            $"Organization: {organization.Name}\nHost: {session.HostId}\nDevice: {session.DeviceSerial}\nRiskScore: {session.RiskScore}";
-
-        var entry = new NotificationsLog
-        {
-            Id = Guid.NewGuid(),
-            OrganizationId = organization.Id,
-            UsbSessionId = session.Id,
-            Severity = incompleteDetection ? "High" : "High",
-            Title = title,
-            Body = body,
-            Channel = NotificationChannel.Email,
-            Status = NotificationStatus.Pending,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        var (success, error) = await _emailSender.SendAsync(organization.Email, title, body, cancellationToken);
-        entry.Status = success ? NotificationStatus.Sent : NotificationStatus.Failed;
-        entry.SentAt = success ? DateTime.UtcNow : null;
-        entry.ErrorMessage = error;
-        await _notifications.AddAsync(entry, cancellationToken);
     }
 }

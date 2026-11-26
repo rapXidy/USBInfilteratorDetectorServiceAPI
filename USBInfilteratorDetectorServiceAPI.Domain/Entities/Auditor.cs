@@ -12,6 +12,10 @@ public class Auditor
     public string Username { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
+    /// <summary>
+    /// Optional notification email for welcome and high-risk alerts.
+    /// </summary>
+    public string? Email { get; set; }
     public AuditorRole Role { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }

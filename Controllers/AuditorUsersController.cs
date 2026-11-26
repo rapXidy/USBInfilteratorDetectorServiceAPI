@@ -29,7 +29,7 @@ public class AuditorUsersController : ControllerBase
         => Ok(await _auditorUserService.ListAsync(User.GetOrganizationId(), cancellationToken));
 
     /// <summary>
-    /// Adds an allowed auditor user.
+    /// Adds an allowed auditor user. A temporary password is generated and emailed to the auditor.
     /// </summary>
     [HttpPost]
     public async Task<ActionResult<AuditorUserResponse>> Create([FromBody] CreateAuditorUserRequest request, CancellationToken cancellationToken)
@@ -41,6 +41,16 @@ public class AuditorUsersController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<AuditorUserResponse>> Update(Guid id, [FromBody] UpdateAuditorUserRequest request, CancellationToken cancellationToken)
         => Ok(await _auditorUserService.UpdateAsync(User.GetOrganizationId(), id, request, cancellationToken));
+
+    /// <summary>
+    /// Emails a new temporary password to the auditor and revokes their refresh tokens.
+    /// </summary>
+    [HttpPost("{id:guid}/reset-password")]
+    public async Task<IActionResult> ResetPassword(Guid id, CancellationToken cancellationToken)
+    {
+        await _auditorUserService.ResetPasswordAsync(User.GetOrganizationId(), id, cancellationToken);
+        return NoContent();
+    }
 
     /// <summary>
     /// Soft-deactivates an auditor user.
