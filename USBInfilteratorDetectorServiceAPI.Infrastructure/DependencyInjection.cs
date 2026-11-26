@@ -25,6 +25,8 @@ public static class DependencyInjection
         services.Configure<NotificationOptions>(configuration.GetSection(NotificationOptions.SectionName));
         services.Configure<EmailSettings>(configuration.GetSection(EmailSettings.SectionName));
         services.Configure<AppCorsOptions>(configuration.GetSection(AppCorsOptions.SectionName));
+        services.Configure<PortalOptions>(options =>
+            options.PortalUrl = configuration[PortalOptions.PortalUrlKey] ?? options.PortalUrl);
 
         var superAdmins = configuration.GetSection(SuperAdminOptions.SectionName).Get<List<SuperAdminAccountOptions>>()
                           ?? new List<SuperAdminAccountOptions>();

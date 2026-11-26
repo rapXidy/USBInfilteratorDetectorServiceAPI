@@ -64,6 +64,7 @@ public sealed class NotificationEnqueueService : INotificationEnqueueService
     public async Task EnqueueAuditorWelcomeAsync(
         Organization organization,
         Auditor auditor,
+        string temporaryPassword,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(auditor.Email))
@@ -77,8 +78,43 @@ public sealed class NotificationEnqueueService : INotificationEnqueueService
             ["OrganizationName"] = organization.Name,
             ["DisplayName"] = auditor.DisplayName,
             ["Username"] = auditor.Username,
+            ["TemporaryPassword"] = temporaryPassword,
             ["Role"] = auditor.Role.ToString(),
             ["CorpCode"] = organization.CorpCode ?? "Pending completion"
+        });
+
+        await AddPendingAsync(
+            organization.Id,
+            usbSessionId: null,
+            severity: "Info",
+            title: subject,
+            body: body,
+            destinationEmail: auditor.Email.Trim(),
+            cancellationToken).ConfigureAwait(false);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task EnqueuePasswordResetAsync(
+        Organization organization,
+        Auditor auditor,
+        string temporaryPassword,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(auditor.Email))
+            return;
+
+        var subject = $"Password reset — {organization.Name}";
+        var body = _templates.Render("PasswordReset", new Dictionary<string, string>
+        {
+            ["Subject"] = subject,
+            ["Heading"] = "Temporary password",
+            ["OrganizationName"] = organization.Name,
+            ["DisplayName"] = auditor.DisplayName,
+            ["Username"] = auditor.Username,
+            ["TemporaryPassword"] = temporaryPassword,
+            ["CorpCode"] = organization.CorpCode ?? "—"
         });
 
         await AddPendingAsync(

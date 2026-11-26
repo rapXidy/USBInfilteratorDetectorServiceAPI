@@ -26,4 +26,16 @@ public class RefreshTokenRepository : IRefreshTokenRepository
 
     /// <inheritdoc />
     public void Update(RefreshToken token) => _db.RefreshTokens.Update(token);
+
+    /// <inheritdoc />
+    public async Task RevokeAllForAuditorAsync(Guid auditorId, CancellationToken cancellationToken = default)
+    {
+        var tokens = await _db.RefreshTokens
+            .Where(x => x.AuditorId == auditorId && x.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        var now = DateTime.UtcNow;
+        foreach (var token in tokens)
+            token.RevokedAt = now;
+    }
 }

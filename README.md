@@ -189,6 +189,8 @@ or the equivalent configured header/scheme.
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/auth/login` | Auditor login |
+| `POST` | `/api/auth/forgot-password` | Email a temporary password (generic response; rate-limited) |
+| `POST` | `/api/auth/change-password` | Change password for the signed-in auditor |
 | `POST` | `/api/auth/refresh` | Refresh access token |
 | `POST` | `/api/auth/logout` | Invalidate refresh token |
 
@@ -213,9 +215,11 @@ or the equivalent configured header/scheme.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/auditors` | List auditors |
-| `POST` | `/api/auditors` | Create auditor |
-| `PUT` | `/api/auditors/{id}` | Update auditor |
+| `GET` | `/api/auditor-users` | List auditors |
+| `POST` | `/api/auditor-users` | Create auditor (no password in body; temporary password generated, hashed, and emailed) |
+| `PUT` | `/api/auditor-users/{id}` | Update auditor profile/role/active |
+| `POST` | `/api/auditor-users/{id}/reset-password` | Email a new temporary password (Admin) |
+| `DELETE` | `/api/auditor-users/{id}` | Soft-deactivate auditor |
 
 ### Subscription & Dashboard
 
@@ -273,7 +277,7 @@ The Worker Service must send payloads that match this contract (see the Worker S
 ## Core Data Model
 
 - **Organizations** – tenant root (`CorpCode`, contact details)
-- **Auditors** – dashboard users (hashed passwords, roles)
+- **Auditors** – dashboard users (email, hashed passwords, roles); Admin-created users receive a generated temporary password by email
 - **AllowedDevices** – approved USB serial numbers per organisation
 - **Subscriptions** – plan + status (FreeTrial default)
 - **Hosts** – reporting endpoints
@@ -303,8 +307,9 @@ Outbound email uses **MailKit** + Gmail SMTP (`EmailSettings`). Domain events en
 Triggered emails:
 
 1. **Onboarding complete** — CorpCode + API key to the organization email
-2. **Auditor created** — welcome mail when the auditor has an email address
-3. **High-risk / incomplete audit** — active auditors with email, else organization email
+2. **Auditor created** — welcome mail with username, CorpCode, and temporary password (email required on create)
+3. **Password reset** — temporary password email from forgot-password or Admin reset-password
+4. **High-risk / incomplete audit** — active auditors with email, else organization email
 
 Delivery attempts are recorded in `NotificationsLog` (`Sent` / `Failed` after configured max attempts).
 

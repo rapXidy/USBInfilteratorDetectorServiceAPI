@@ -17,11 +17,21 @@ public interface INotificationEnqueueService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Enqueues welcome email for a newly created auditor.
+    /// Enqueues welcome email for a newly created auditor, including the temporary password.
     /// </summary>
     Task EnqueueAuditorWelcomeAsync(
         Organization organization,
         Auditor auditor,
+        string temporaryPassword,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Enqueues a password-reset email with a new temporary password.
+    /// </summary>
+    Task EnqueuePasswordResetAsync(
+        Organization organization,
+        Auditor auditor,
+        string temporaryPassword,
         CancellationToken cancellationToken = default);
 
     /// <summary>
